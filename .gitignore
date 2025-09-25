@@ -1,5 +1,22 @@
+# venv & cache
 venv/
 .venv/
 __pycache__/
 *.pyc
+
+# outputs & media
+anki_output/
+*.apkg
+*.wav
+*.mp3
+*.tmp
+*.log
+
+# OS / editor
 .DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# secrets
+.env

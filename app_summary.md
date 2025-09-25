@@ -32,6 +32,10 @@ Target baru: **membuat aplikasi web ringan** (misal dengan Streamlit) agar pengg
 
    * Menghasilkan file `.apkg` yang sudah termasuk media audio dan siap diimport ke Anki.
 
+6. **FFMpeg**
+
+   *FFMpeg akan di-hardcode di path `AudioSegment.converter = r"S:\ffmpeg\bin\ffmpeg.exe"`
+
 ---
 
 ## 🔧 Keterbatasan Versi Hardcode
