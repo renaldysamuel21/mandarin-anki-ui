@@ -7,6 +7,7 @@ import csv
 import random
 import re
 from pathlib import Path
+import os
 from typing import Callable, Dict, List, Optional, Protocol, Sequence
 
 import genanki
@@ -138,8 +139,30 @@ def _literal_to_br(text: str, enable: bool) -> str:
 
 
 def _ensure_ffmpeg(path: Optional[Path]) -> None:
-    if path and path.exists():
-        AudioSegment.converter = str(path)
+    """Configure pydub so it can locate FFmpeg on the current machine."""
+
+    if not path:
+        return
+
+    candidate = path.expanduser()
+    if candidate.is_dir():
+        exe_name = "ffmpeg.exe" if os.name == "nt" else "ffmpeg"
+        candidate = candidate / exe_name
+
+    if not candidate.exists():
+        raise DeckBuildError(f"FFmpeg tidak ditemukan di path yang diberikan: {candidate}")
+
+    resolved = candidate.resolve()
+    AudioSegment.converter = str(resolved)
+    # pydub uses ``ffmpeg``/``converter`` for exporting audio; configuring
+    # ``ffprobe`` as well helps it avoid additional lookups on some platforms.
+    if hasattr(AudioSegment, "ffmpeg"):
+        AudioSegment.ffmpeg = str(resolved)
+    ffprobe_candidate = resolved.with_name(
+        "ffprobe.exe" if resolved.name.lower().endswith(".exe") else "ffprobe"
+    )
+    if ffprobe_candidate.exists() and hasattr(AudioSegment, "ffprobe"):
+        AudioSegment.ffprobe = str(ffprobe_candidate)
 
 
 def _notify(callback: Optional[ProgressCallback], stage: str, *, current: int = 0, total: int = 0, message: Optional[str] = None) -> None:
@@ -204,7 +227,16 @@ def _render_audio(
     else:
         mixed = voice
 
-    mixed.export(final_path, format=config.audio_format, bitrate=config.bitrate)
+    try:
+        mixed.export(final_path, format=config.audio_format, bitrate=config.bitrate)
+    except FileNotFoundError as exc:
+        converter = getattr(AudioSegment, "converter", None)
+        hint = (
+            "Pastikan FFmpeg terinstal dan path-nya benar."
+            if converter is None
+            else f"Pastikan FFmpeg dapat dijalankan dari: {converter}"
+        )
+        raise FileNotFoundError(f"Gagal mengekspor audio melalui FFmpeg. {hint}") from exc
     try:
         tmp_wav.unlink(missing_ok=True)
     except Exception:  # pragma: no cover - best effort cleanup
