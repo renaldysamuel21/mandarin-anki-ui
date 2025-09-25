@@ -20,3 +20,5 @@ Thumbs.db
 
 # secrets
 .env
+
+project_copy.py
