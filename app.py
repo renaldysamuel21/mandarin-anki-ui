@@ -147,7 +147,10 @@ def _handle_generation(tmp_dir: Path) -> Optional[DeckBuildResult]:
         st.error("Speaker WAV tidak ditemukan (upload atau letakkan 'vocal_serena1.wav' di root proyek).")
         return None
 
-    ffmpeg_path = Path(ffmpeg_path_text).expanduser() if ffmpeg_path_text else None
+    ffmpeg_text = ffmpeg_path_text.strip()
+    if ffmpeg_text.startswith('"') and ffmpeg_text.endswith('"'):
+        ffmpeg_text = ffmpeg_text[1:-1]
+    ffmpeg_path = Path(ffmpeg_text).expanduser() if ffmpeg_text else None
     out_dir = Path(output_dir_text).expanduser()
 
     with st.status("Menyiapkan…", expanded=True) as status:
