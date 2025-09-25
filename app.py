@@ -54,13 +54,13 @@ def _format_delimiter(label: str) -> str:
 with st.sidebar:
     st.header("⚙️ Settings")
 
-    ffmpeg_path_text = st.text_input("FFmpeg Path (opsional)", "")
+    ffmpeg_path_text = "S:/ffmpeg/bin/ffmpeg.exe"
     tts_model = st.text_input("TTS Model", "tts_models/multilingual/multi-dataset/xtts_v2")
     tts_lang = st.text_input("Bahasa TTS", "zh-cn")
 
     st.markdown("---")
     st.subheader("🔊 Audio")
-    regenerate = st.checkbox("Regenerate audio jika file sudah ada", False)
+    regenerate = st.checkbox("Regenerate audio jika file sudah ada", True)
     voice_db = st.slider("Volume voice (dB, negatif lebih pelan)", -24, 6, -6)
     ambient_db = st.slider("Volume ambient (dB, negatif lebih pelan)", -60, 0, -38)
 
