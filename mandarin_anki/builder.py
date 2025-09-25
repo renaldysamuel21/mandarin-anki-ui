@@ -8,7 +8,10 @@ import random
 import re
 from pathlib import Path
 import os
+
 import shutil
+
+
 from typing import Callable, Dict, List, Optional, Protocol, Sequence
 
 import genanki
@@ -162,6 +165,7 @@ def _normalise_ffmpeg_candidate(value: Path) -> Path:
 def _ensure_ffmpeg(path: Optional[Path]) -> None:
     """Configure pydub so it can locate FFmpeg on the current machine."""
 
+
     if path:
         candidate = _normalise_ffmpeg_candidate(path)
         if not candidate.exists():
@@ -197,6 +201,30 @@ def _ensure_ffmpeg(path: Optional[Path]) -> None:
     raise DeckBuildError(
         "FFmpeg tidak ditemukan. Isi path FFmpeg di pengaturan atau tambahkan ke PATH."
     )
+
+    if not path:
+        return
+
+    candidate = path.expanduser()
+    if candidate.is_dir():
+        exe_name = "ffmpeg.exe" if os.name == "nt" else "ffmpeg"
+        candidate = candidate / exe_name
+
+    if not candidate.exists():
+        raise DeckBuildError(f"FFmpeg tidak ditemukan di path yang diberikan: {candidate}")
+
+    resolved = candidate.resolve()
+    AudioSegment.converter = str(resolved)
+    # pydub uses ``ffmpeg``/``converter`` for exporting audio; configuring
+    # ``ffprobe`` as well helps it avoid additional lookups on some platforms.
+    if hasattr(AudioSegment, "ffmpeg"):
+        AudioSegment.ffmpeg = str(resolved)
+    ffprobe_candidate = resolved.with_name(
+        "ffprobe.exe" if resolved.name.lower().endswith(".exe") else "ffprobe"
+    )
+    if ffprobe_candidate.exists() and hasattr(AudioSegment, "ffprobe"):
+        AudioSegment.ffprobe = str(ffprobe_candidate)
+
 
 
 def _notify(callback: Optional[ProgressCallback], stage: str, *, current: int = 0, total: int = 0, message: Optional[str] = None) -> None:
