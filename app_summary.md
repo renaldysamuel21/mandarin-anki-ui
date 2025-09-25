@@ -7,7 +7,7 @@ Berikut ringkasan **app\_summary.md** yang bisa kamu pakai untuk mendeskripsikan
 ## 🎯 Tujuan
 
 Aplikasi ini menghasilkan file **`.apkg`** yang siap diimport ke Anki dari sebuah file **CSV** berisi data Mandarin (Hanzi, pinyin, arti, literal, grammar).
-Versi awal skrip ditulis **hardcoded**: semua path (CSV, TTS model, FFmpeg, output) dan parameter dipasang langsung di dalam file Python.
+Versi awal skrip ditulis **hardcoded**: semua path (CSV, TTS model, FFmpeg, output) dan parameter dipasang langsung di dalam file Python. Bisa cek di file `anki_builder.py`.
 
 Target baru: **membuat aplikasi web ringan** (misal dengan Streamlit) agar pengguna bisa meng-upload CSV dan file pendukung (audio speaker, ambient), memilih opsi parsing/konfigurasi melalui UI, lalu mengunduh hasil `.apkg` yang dihasilkan.
 
