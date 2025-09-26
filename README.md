@@ -6,6 +6,7 @@ A Streamlit web app that turns Mandarin vocabulary or sentence lists into polish
 
 - Upload CSV dengan kolom Hanzi, Pinyin, dan terjemahan Indonesia.
 - Mixing otomatis antara suara TTS dan ambience ruangan.
+- Tambahan ~150 ms ambience sunyi di awal setiap audio untuk mencegah suara awal terpotong.
 - Pengaturan delimiter, encoding, pemetaan kolom, dan bitrate audio.
 - Progress bar & log status saat build deck.
 - Galat per baris ditampilkan sehingga mudah diperbaiki.
