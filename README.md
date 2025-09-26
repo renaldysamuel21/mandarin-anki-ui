@@ -1,4 +1,4 @@
-# Mandarin → Anki Deck Builder
+# Mandarin → Anki Deck Builder (v2.0)
 
 A Streamlit web app that turns Mandarin vocabulary or sentence lists into polished Anki decks complete with Coqui TTS audio.
 
@@ -9,6 +9,7 @@ A Streamlit web app that turns Mandarin vocabulary or sentence lists into polish
 - Pengaturan delimiter, encoding, pemetaan kolom, dan bitrate audio.
 - Progress bar & log status saat build deck.
 - Galat per baris ditampilkan sehingga mudah diperbaiki.
+- Tab "🔊 Hanzi → Audio" untuk membuat audio MP3/WAV cepat dari teks Hanzi dan mengunduhnya langsung.
 
 ## 🚀 Persiapan di Windows
 
@@ -36,6 +37,8 @@ A Streamlit web app that turns Mandarin vocabulary or sentence lists into polish
    streamlit run app.py
    ```
 7. Buka browser ke `http://localhost:8501`.
+
+Tab pertama berfokus pada builder deck CSV → `.apkg`, sedangkan tab kedua memungkinkan Anda mengetik Hanzi lalu langsung memutar atau mengunduh hasil audionya.
 
 ## 🛠️ Troubleshooting
 
