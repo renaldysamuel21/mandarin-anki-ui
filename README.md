@@ -10,6 +10,7 @@ A Streamlit web app that turns Mandarin vocabulary or sentence lists into polish
 - Progress bar & log status saat build deck.
 - Galat per baris ditampilkan sehingga mudah diperbaiki.
 - Tab "🔊 Hanzi → Audio" untuk membuat audio MP3/WAV cepat dari teks Hanzi dan mengunduhnya langsung.
+- Dukungan upload opsional file speaker WAV di tab Hanzi → Audio (gunakan `vocal_serena1.wav` bawaan jika tidak memilih file).
 
 ## 🚀 Persiapan di Windows
 
