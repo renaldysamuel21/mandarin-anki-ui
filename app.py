@@ -44,6 +44,9 @@ project_root = Path(".").resolve()
 default_speaker = project_root / "vocal_serena1.wav"
 default_ambient = project_root / "room.wav"
 
+# Placeholder to satisfy type checkers; actual value diberikan oleh uploader Streamlit di tab deck.
+deck_speaker_file = None
+
 def _resolve_default_audio(label: str, default_path: Path) -> None:
     if not default_path.exists():
         st.sidebar.warning(f"Letakkan file default {label} di: {default_path}")
@@ -88,7 +91,7 @@ def _handle_generation(tmp_dir: Path) -> Optional[DeckBuildResult]:
     csv_path = tmp_dir / "input.csv"
     csv_path.write_bytes(csv_file.read())
 
-    speaker_path = _prepare_audio_file(speaker_file, tmp_dir, "speaker.wav", default_speaker)
+    speaker_path = _prepare_audio_file(deck_speaker_file, tmp_dir, "speaker.wav", default_speaker)
     ambient_path = None
     if ambient_file:
         ambient_path = _prepare_audio_file(ambient_file, tmp_dir, "ambient.wav", default_ambient)
@@ -200,7 +203,9 @@ with deck_tab:
     with left:
         st.subheader("📥 Upload")
         csv_file = st.file_uploader("CSV (delimiter sesuai pilihan)", type=["csv", "txt"], key="csv_uploader")
-        speaker_file = st.file_uploader("Speaker WAV (opsional)", type=["wav"], key="speaker_uploader")
+        deck_speaker_file = st.file_uploader(
+            "Speaker WAV (opsional)", type=["wav"], key="speaker_uploader"
+        )
         ambient_file = st.file_uploader("Ambient WAV (opsional)", type=["wav"], key="ambient_uploader")
 
         st.markdown(
@@ -249,6 +254,17 @@ with audio_tab:
 
     hanzi_text = st.text_area("Teks Hanzi", height=220, placeholder="例如：今天的天气怎么样？")
 
+    audio_speaker_file = st.file_uploader(
+        "Speaker WAV khusus tab ini (opsional)",
+        type=["wav"],
+        key="audio_tab_speaker_uploader",
+    )
+    st.markdown(
+        "<span class='small'>Opsional: unggah sampel suara .wav untuk meniru speaker tertentu."
+        " Jika dikosongkan, aplikasi memakai `vocal_serena1.wav` bawaan.</span>",
+        unsafe_allow_html=True,
+    )
+
     preview_state = st.session_state.setdefault("audio_preview", {})
 
     if st.button("🎧 Generate Audio", type="primary", key="generate_audio_button"):
@@ -257,7 +273,9 @@ with audio_tab:
         else:
             with tempfile.TemporaryDirectory() as tmpdir:
                 tmp_dir = Path(tmpdir)
-                speaker_path = _prepare_audio_file(speaker_file, tmp_dir, "speaker.wav", default_speaker)
+                speaker_path = _prepare_audio_file(
+                    audio_speaker_file, tmp_dir, "speaker.wav", default_speaker
+                )
                 ambient_path = None
                 if ambient_file:
                     ambient_path = _prepare_audio_file(ambient_file, tmp_dir, "ambient.wav", default_ambient)
