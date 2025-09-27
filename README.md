@@ -6,10 +6,14 @@ A Streamlit web app that turns Mandarin vocabulary or sentence lists into polish
 
 - Upload CSV dengan kolom Hanzi, Pinyin, dan terjemahan Indonesia.
 - Mixing otomatis antara suara TTS dan ambience ruangan.
+- Tambahan ~150 ms ambience sunyi di awal setiap audio untuk mencegah suara awal terpotong.
 - Pengaturan delimiter, encoding, pemetaan kolom, dan bitrate audio.
 - Progress bar & log status saat build deck.
 - Galat per baris ditampilkan sehingga mudah diperbaiki.
 - Tab "🔊 Hanzi → Audio" untuk membuat audio MP3/WAV cepat dari teks Hanzi dan mengunduhnya langsung.
+- Dukungan upload opsional file speaker WAV di tab Hanzi → Audio (gunakan `vocal_serena1.wav` bawaan jika tidak memilih file).
+- Preview 10 baris pertama CSV dalam format kartu Anki sebelum proses build untuk memastikan data sudah benar.
+- Tab "🃏 Anki Deck Previewer" untuk mengunggah deck `.apkg`, menelusuri daftar kartu, dan melihat sisi depan/belakang lengkap dengan audio yang dapat diputar.
 
 ## 🚀 Persiapan di Windows
 
@@ -38,7 +42,7 @@ A Streamlit web app that turns Mandarin vocabulary or sentence lists into polish
    ```
 7. Buka browser ke `http://localhost:8501`.
 
-Tab pertama berfokus pada builder deck CSV → `.apkg`, sedangkan tab kedua memungkinkan Anda mengetik Hanzi lalu langsung memutar atau mengunduh hasil audionya.
+Tab pertama berfokus pada builder deck CSV → `.apkg`, tab kedua memungkinkan Anda mengetik Hanzi lalu langsung memutar/unduh hasil audio, dan tab ketiga "🃏 Anki Deck Previewer" membantu meninjau isi deck `.apkg` tanpa membuka Anki.
 
 ## 🛠️ Troubleshooting
 
