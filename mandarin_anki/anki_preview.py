@@ -29,6 +29,7 @@ class PreviewCard:
     template_name: str
     front_html: str
     back_html: str
+    back_only_html: str
     front_summary: str
     css: str
 
@@ -165,6 +166,12 @@ def _load_collection(collection_path: Path, media_bytes: Mapping[str, bytes]) ->
                 media_map=media_bytes,
                 front_side=front,
             )
+            back_only = render_template(
+                template.get("afmt", ""),
+                field_map,
+                media_map=media_bytes,
+                front_side="",
+            )
             summary = _summarise_front(front)
             deck_name = deck_names.get(row["did"], f"Deck {row['did']}")
             cards.append(
@@ -176,6 +183,7 @@ def _load_collection(collection_path: Path, media_bytes: Mapping[str, bytes]) ->
                     template_name=str(template.get("name", f"Card {ord_index}")),
                     front_html=front,
                     back_html=back,
+                    back_only_html=back_only,
                     front_summary=summary,
                     css=css,
                 )

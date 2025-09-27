@@ -4,6 +4,7 @@ from __future__ import annotations
 import csv
 import html
 import hashlib
+import math
 from dataclasses import dataclass
 import io
 from pathlib import Path
@@ -96,6 +97,7 @@ AUDIO_PLACEHOLDER_TEMPLATE = (
 # Placeholder agar variabel ada di scope global saat tab lain mengaksesnya
 deck_speaker_file = None
 ambient_file = None  # dipakai juga oleh tab Hanzi→Audio
+
 
 @dataclass(frozen=True)
 class BuilderPreviewCard:
@@ -225,6 +227,10 @@ def _build_csv_preview_rows(
         rows.append(BuilderPreviewRow(index=idx, uid=uid, cards=cards))
 
     return rows, errors
+
+
+def _reset_apkg_page() -> None:
+    st.session_state["apkg_page"] = 1
 
 
 def _render_csv_preview_html(rows: List[BuilderPreviewRow]) -> str:
@@ -424,6 +430,7 @@ deck_tab, audio_tab, preview_tab = st.tabs([
     "🃏 Anki Deck Previewer",
 ])
 
+
 # ------------------
 # TAB: Deck Builder
 # ------------------
@@ -589,11 +596,11 @@ with audio_tab:
                 speaker_path = _prepare_audio_file(
                     audio_speaker_file, tmp_dir, "speaker.wav", default_speaker
                 )
-                amb_path = None
+                ambient_path = None
                 if ambient_file:
-                    amb_path = _prepare_audio_file(ambient_file, tmp_dir, "ambient.wav", default_ambient)
+                    ambient_path = _prepare_audio_file(ambient_file, tmp_dir, "ambient.wav", default_ambient)
                 elif default_ambient.exists():
-                    amb_path = default_ambient
+                    ambient_path = default_ambient
 
                 if not speaker_path.exists():
                     st.error("Speaker WAV tidak ditemukan (upload atau letakkan 'vocal_serena1.wav' di root proyek).")
@@ -605,7 +612,7 @@ with audio_tab:
                                 text=hanzi_text,
                                 output_path=output_file,
                                 speaker_wav=speaker_path,
-                                ambient_wav=amb_path,
+                                ambient_wav=ambient_path,
                                 ffmpeg_path=_parse_ffmpeg_path(ffmpeg_path_text),
                                 tts_model_name=tts_model,
                                 tts_lang=tts_lang,
@@ -653,7 +660,36 @@ with preview_tab:
         unsafe_allow_html=True,
     )
 
-    apkg_state = st.session_state.setdefault("apkg_preview", {})
+    st.markdown(
+        """
+        <style>
+        .apkg-card-list { max-height: 80vh; overflow-y: auto; padding-right: 0.5rem; }
+        .apkg-card-list .stRadio > div { gap: 0.35rem; }
+        .apkg-card-list label { border-radius: 8px; padding: 0.35rem 0.5rem; border:1px solid transparent; }
+        .apkg-card-list label:hover { background: rgba(255,255,255,0.05); }
+        .apkg-card-list label[data-baseweb] { cursor: pointer; }
+        .apkg-preview-header-block { position: sticky; top: 0; z-index: 20; background: var(--panel,#15151c); padding: 0.75rem; border-radius: 12px; border:1px solid #2a2a34; margin-bottom: 0.75rem; box-shadow: 0 8px 24px rgba(0,0,0,0.25); }
+        .apkg-card-frame { height: 72vh; border-radius: 12px; overflow-y: auto; border:1px solid #2a2a34; background: var(--panel,#15151c); padding: 0.5rem; }
+        .apkg-card-section { margin-bottom: 1.25rem; }
+        .apkg-card-section:last-child { margin-bottom: 0; }
+        .apkg-answer-divider { border: 0; border-top: 1px dashed rgba(255,255,255,0.1); margin: 1.5rem 0; }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    session = st.session_state
+    session.setdefault("apkg_cards", [])
+    session.setdefault("apkg_selected_card_id", None)
+    session.setdefault("apkg_show_answer", False)
+    session.setdefault("apkg_page", 1)
+    session.setdefault("apkg_page_size", 50)
+    session.setdefault("apkg_filter", "")
+    session.setdefault("apkg_error", None)
+    session.setdefault("apkg_error_traceback", None)
+    session.setdefault("apkg_digest", None)
+    session.setdefault("apkg_filename", None)
+
     apkg_file = st.file_uploader(
         "Deck Anki (.apkg)", type=["apkg"], key="deck_previewer_apkg_uploader"
     )
@@ -661,98 +697,243 @@ with preview_tab:
     if apkg_file is not None:
         apkg_bytes = apkg_file.getvalue()
         digest = hashlib.sha1(apkg_bytes).hexdigest()
-        if apkg_state.get("digest") != digest:
+        if session.get("apkg_digest") != digest:
             with st.spinner("Memuat deck…"):
                 try:
                     preview_data: ApkgPreview = load_apkg_preview(apkg_bytes)
                 except ApkgPreviewError as exc:
-                    st.error(str(exc))
-                    apkg_state.clear()
-                    apkg_state["error"] = str(exc)
-                except Exception as exc:  # pragma: no cover
-                    st.error(f"Gagal memuat deck: {exc}")
-                    st.write(
-                        """<pre style='white-space:pre-wrap;'>"""
-                        + traceback.format_exc()
-                        + "</pre>",
-                        unsafe_allow_html=True,
-                    )
-                    apkg_state.clear()
-                    apkg_state["error"] = str(exc)
+                    session["apkg_error"] = str(exc)
+                    session["apkg_error_traceback"] = None
+                    session["apkg_cards"] = []
+                    session["apkg_selected_card_id"] = None
+                except Exception as exc:  # pragma: no cover - defensive logging
+                    session["apkg_error"] = f"Gagal memuat deck: {exc}"
+                    session["apkg_error_traceback"] = traceback.format_exc()
+                    session["apkg_cards"] = []
+                    session["apkg_selected_card_id"] = None
                 else:
-                    apkg_state.clear()
-                    apkg_state.update(
-                        {
-                            "digest": digest,
-                            "cards": preview_data.cards,
-                            "filename": apkg_file.name,
-                            "error": None,
-                            "selected": preview_data.cards[0].card_id if preview_data.cards else None,
-                            "show_answer": False,
-                        }
+                    session["apkg_error"] = None
+                    session["apkg_error_traceback"] = None
+                    session["apkg_digest"] = digest
+                    session["apkg_filename"] = apkg_file.name
+                    session["apkg_cards"] = preview_data.cards
+                    session["apkg_selected_card_id"] = (
+                        preview_data.cards[0].card_id if preview_data.cards else None
                     )
-                    st.session_state.pop("apkg_card_radio", None)
-    elif not apkg_state:
-        apkg_state["cards"] = []
+                    session["apkg_show_answer"] = False
+                    session["apkg_page"] = 1
+                    session["apkg_filter"] = ""
+                    session.pop("apkg_card_radio", None)
+    if session.get("apkg_error"):
+        st.error(session["apkg_error"])
+        if session.get("apkg_error_traceback"):
+            st.write(
+                """<pre style='white-space:pre-wrap;'>"""
+                + session["apkg_error_traceback"]
+                + "</pre>",
+                unsafe_allow_html=True,
+            )
 
-    if apkg_state.get("error"):
-        st.error(apkg_state["error"])
-
-    cards: List[PreviewCard] = apkg_state.get("cards") or []
+    cards: List[PreviewCard] = session.get("apkg_cards") or []
     if cards:
-        selected_id = apkg_state.get("selected")
-        card_ids = {card.card_id for card in cards}
-        if selected_id not in card_ids:
+        selected_id = session.get("apkg_selected_card_id")
+        all_ids = {card.card_id for card in cards}
+        if selected_id not in all_ids:
             selected_id = cards[0].card_id
-            apkg_state["selected"] = selected_id
+            session["apkg_selected_card_id"] = selected_id
 
-        labels: List[str] = []
-        label_to_id: Dict[str, int] = {}
-        for card in cards:
-            summary = card.front_summary or "(kosong)"
-            if len(summary) > 80:
-                summary = summary[:77] + "…"
-            base_label = f"{card.deck_name} • {summary}"
-            label = base_label if base_label not in label_to_id else f"{base_label} (#{card.card_id})"
-            labels.append(label)
-            label_to_id[label] = card.card_id
+        filtered_cards: List[PreviewCard] = cards
+        paged_cards: List[PreviewCard] = cards
 
-        default_label = next(
-            (label for label, cid in label_to_id.items() if cid == selected_id),
-            labels[0],
-        )
-        if st.session_state.get("apkg_card_radio") not in label_to_id:
-            st.session_state["apkg_card_radio"] = default_label
-
-        list_col, preview_col = st.columns([1, 2])
+        list_col, preview_col = st.columns([1, 2], gap="large")
 
         with list_col:
-            filename = apkg_state.get("filename") or "Tanpa nama"
+            filename = session.get("apkg_filename") or "Tanpa nama"
             st.caption(f"Deck: {filename} • {len(cards)} kartu")
-            selected_label = st.radio("Daftar kartu", labels, key="apkg_card_radio")
-            selected_id = label_to_id[selected_label]
-            if selected_id != apkg_state.get("selected"):
-                apkg_state["selected"] = selected_id
-                apkg_state["show_answer"] = False
 
-        selected_card = next(card for card in cards if card.card_id == selected_id)
-        show_answer = apkg_state.get("show_answer", False)
+            st.text_input(
+                "Filter deck/front",
+                key="apkg_filter",
+                placeholder="Cari kata kunci…",
+                on_change=_reset_apkg_page,
+            )
+            filter_value = (session.get("apkg_filter") or "").strip().lower()
+            if filter_value:
+                filtered_cards = [
+                    card
+                    for card in cards
+                    if filter_value in (card.front_summary or "").lower()
+                    or filter_value in (card.deck_name or "").lower()
+                ]
+            else:
+                filtered_cards = cards
+
+            page_size_options = [25, 50, 100]
+            current_page_size = session.get("apkg_page_size", 50)
+            if current_page_size not in page_size_options:
+                current_page_size = 50
+                session["apkg_page_size"] = current_page_size
+
+            page_size = st.selectbox(
+                "Kartu per halaman",
+                options=page_size_options,
+                index=page_size_options.index(current_page_size),
+                key="apkg_page_size",
+                on_change=_reset_apkg_page,
+            )
+            if page_size <= 0:
+                page_size = 25
+                session["apkg_page_size"] = page_size
+
+            total_filtered = len(filtered_cards)
+            total_pages = max(1, math.ceil(total_filtered / page_size)) if total_filtered else 1
+            current_page = int(session.get("apkg_page", 1) or 1)
+            if current_page > total_pages:
+                current_page = total_pages
+                session["apkg_page"] = current_page
+
+            page = int(
+                st.number_input(
+                    "Halaman",
+                    min_value=1,
+                    max_value=total_pages,
+                    step=1,
+                    key="apkg_page",
+                )
+            )
+
+            start_idx = (page - 1) * page_size
+            end_idx = start_idx + page_size
+            paged_cards = filtered_cards[start_idx:end_idx]
+
+            if paged_cards:
+                filtered_ids = {card.card_id for card in filtered_cards}
+                selection_changed = False
+                if selected_id not in filtered_ids:
+                    selected_id = paged_cards[0].card_id
+                    session["apkg_selected_card_id"] = selected_id
+                    selection_changed = True
+
+                page_ids = [card.card_id for card in paged_cards]
+                if selected_id not in page_ids:
+                    selected_id = paged_cards[0].card_id
+                    session["apkg_selected_card_id"] = selected_id
+                    selection_changed = True
+
+                labels: List[str] = []
+                label_to_id: Dict[str, int] = {}
+                for card in paged_cards:
+                    summary = card.front_summary or "(kosong)"
+                    if len(summary) > 80:
+                        summary = summary[:77] + "…"
+                    base_label = f"{card.deck_name} • {summary}"
+                    label = (
+                        base_label
+                        if base_label not in label_to_id
+                        else f"{base_label} (#{card.card_id})"
+                    )
+                    labels.append(label)
+                    label_to_id[label] = card.card_id
+
+                default_label = next(
+                    (label for label, cid in label_to_id.items() if cid == selected_id),
+                    labels[0],
+                )
+                if (
+                    session.get("apkg_card_radio") not in label_to_id
+                    or selection_changed
+                ):
+                    session["apkg_card_radio"] = default_label
+
+                st.markdown(
+                    f"<span class='small'>Menampilkan {start_idx + 1}–{start_idx + len(paged_cards)} dari {total_filtered} kartu cocok.</span>",
+                    unsafe_allow_html=True,
+                )
+                st.markdown("<div class='apkg-card-list'>", unsafe_allow_html=True)
+                selected_label = st.radio(
+                    "Daftar kartu",
+                    labels,
+                    key="apkg_card_radio",
+                    label_visibility="collapsed",
+                )
+                st.markdown("</div>", unsafe_allow_html=True)
+                selected_id = label_to_id[selected_label]
+                session["apkg_selected_card_id"] = selected_id
+            else:
+                st.info("Tidak ada kartu yang cocok dengan filter ini.")
+                session["apkg_selected_card_id"] = None
+                session.pop("apkg_card_radio", None)
+
+        selected_card = None
+        if session.get("apkg_selected_card_id") is not None:
+            selected_card = next(
+                (
+                    card
+                    for card in cards
+                    if card.card_id == session["apkg_selected_card_id"]
+                ),
+                None,
+            )
 
         with preview_col:
-            st.markdown(
-                f"**Template:** {selected_card.template_name}"
-            )
-            toggle_label = "Show Answer" if not show_answer else "Tampilkan Front"
-            if st.button(toggle_label, key="apkg_toggle_answer"):
-                show_answer = not show_answer
-                apkg_state["show_answer"] = show_answer
+            if selected_card is None:
+                st.info("Pilih kartu dari daftar kiri untuk melihat preview.")
+            else:
+                show_answer = session.get("apkg_show_answer", False)
+                total_filtered = len(filtered_cards)
+                card_position = (
+                    next(
+                        (idx for idx, card in enumerate(filtered_cards, start=1) if card.card_id == selected_card.card_id),
+                        None,
+                    )
+                    if filtered_cards
+                    else None
+                )
 
-            html_doc = wrap_card_html(
-                selected_card.back_html if show_answer else selected_card.front_html,
-                selected_card.css,
-            )
-            st.components.v1.html(html_doc, height=560, scrolling=True)
-    elif apkg_file is not None and not apkg_state.get("error"):
+                st.markdown("<div class='apkg-preview-header-block'>", unsafe_allow_html=True)
+                header_left, header_right = st.columns([1, 1])
+                with header_left:
+                    show_answer = st.checkbox(
+                        "Tampilkan jawaban",
+                        key="apkg_show_answer",
+                    )
+                with header_right:
+                    if card_position is not None:
+                        st.markdown(
+                            f"**Kartu {card_position} dari {total_filtered} hasil filter**"
+                        )
+                    st.caption(
+                        f"Template: {selected_card.template_name} • Deck: {selected_card.deck_name}"
+                    )
+                st.markdown("</div>", unsafe_allow_html=True)
+
+                if show_answer:
+                    back_only = selected_card.back_only_html or ""
+                    if not back_only.strip():
+                        back_only = selected_card.back_html
+                    body = "".join(
+                        [
+                            "<div class='apkg-card-section apkg-front-section'>",
+                            selected_card.front_html,
+                            "</div>",
+                        ]
+                    )
+                    if back_only.strip():
+                        body += "<hr class='apkg-answer-divider' />"
+                        body += "<div class='apkg-card-section apkg-back-section'>"
+                        body += back_only
+                        body += "</div>"
+                else:
+                    body = selected_card.front_html
+
+                html_doc = wrap_card_html(
+                    body,
+                    selected_card.css,
+                )
+                st.markdown("<div class='apkg-card-frame'>", unsafe_allow_html=True)
+                st.components.v1.html(html_doc, height=560, scrolling=True)
+                st.markdown("</div>", unsafe_allow_html=True)
+    elif apkg_file is not None and not session.get("apkg_error"):
         st.info("Deck tidak memiliki kartu untuk dipreview.")
-    else:
+    elif not session.get("apkg_error"):
         st.info("Upload file deck .apkg untuk mulai melakukan preview.")
