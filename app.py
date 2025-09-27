@@ -94,8 +94,9 @@ AUDIO_PLACEHOLDER_TEMPLATE = (
     "<span class='preview-placeholder'>Audio {name} akan dibuat saat ekspor deck.</span>"
 )
 
-# Placeholder to satisfy type checkers; actual value diberikan oleh uploader Streamlit di tab deck.
+# Placeholder agar variabel ada di scope global saat tab lain mengaksesnya
 deck_speaker_file = None
+ambient_file = None  # dipakai juga oleh tab Hanzi→Audio
 
 
 @dataclass(frozen=True)
@@ -110,6 +111,7 @@ class BuilderPreviewRow:
     index: int
     uid: str
     cards: List[BuilderPreviewCard]
+
 
 def _resolve_default_audio(label: str, default_path: Path) -> None:
     if not default_path.exists():
@@ -429,6 +431,9 @@ deck_tab, audio_tab, preview_tab = st.tabs([
 ])
 
 
+# ------------------
+# TAB: Deck Builder
+# ------------------
 with deck_tab:
     csv_preview_bytes: Optional[bytes] = None
     csv_preview_rows: List[BuilderPreviewRow] = []
@@ -557,7 +562,9 @@ with deck_tab:
                     mime="application/vnd.anki",
                 )
 
-
+# ------------------
+# TAB: Hanzi → Audio
+# ------------------
 with audio_tab:
     st.subheader("🔊 Hanzi → Audio Helper")
     st.markdown(
@@ -617,7 +624,7 @@ with audio_tab:
                         )
                     except DeckBuildError as exc:
                         st.error(str(exc))
-                    except Exception as exc:  # pragma: no cover - defensive against unexpected issues
+                    except Exception as exc:  # pragma: no cover
                         st.error(f"Gagal menghasilkan audio: {exc}")
                         st.write(
                             """<pre style='white-space:pre-wrap;'>""" + traceback.format_exc() + "</pre>",
@@ -643,7 +650,9 @@ with audio_tab:
             mime=preview_state.get("mime", "audio/mpeg"),
         )
 
-
+# ------------------
+# TAB: Anki Deck Previewer
+# ------------------
 with preview_tab:
     st.subheader("🃏 Anki Deck Previewer")
     st.markdown(
