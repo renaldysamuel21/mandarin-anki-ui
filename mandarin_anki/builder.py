@@ -14,6 +14,9 @@ import genanki
 from pydub import AudioSegment
 
 
+PRE_ROLL_AMBIENT_MS = 150
+
+
 DEFAULT_COLUMNS: Dict[str, str] = {
     "Hanzi": "Hanzi",
     "Pinyin": "Pinyin",
@@ -198,6 +201,14 @@ def _load_audio(path: Path, volume_db: float) -> AudioSegment:
     return segment + volume_db
 
 
+def _make_silence(duration_ms: int) -> AudioSegment:
+    silent_factory = getattr(AudioSegment, "silent", None)
+    if callable(silent_factory):
+        return silent_factory(duration=duration_ms)
+    # Fallback for the lightweight AudioSegment test stub which lacks ``silent``.
+    return AudioSegment(duration_ms)
+
+
 def _render_audio(
     *,
     tts: TTSLike,
@@ -217,18 +228,25 @@ def _render_audio(
     )
 
     voice = _load_audio(tmp_wav, config.volume_voice_db)
+    ambient_padding = _make_silence(PRE_ROLL_AMBIENT_MS)
     if ambient_wav and ambient_wav.exists():
         ambient = _load_audio(ambient_wav, config.volume_ambient_db)
-        if len(ambient) < len(voice):
-            repeat = (len(voice) // len(ambient)) + 1
+        required_length = PRE_ROLL_AMBIENT_MS + len(voice)
+        if len(ambient) == 0:
+            ambient = _make_silence(required_length or 1)
+        if len(ambient) < required_length:
+            repeat = (required_length // len(ambient)) + 1
             ambient = ambient * repeat
-        ambient = ambient[: len(voice)]
-        mixed = voice.overlay(ambient)
+        ambient_overlay = ambient[PRE_ROLL_AMBIENT_MS : PRE_ROLL_AMBIENT_MS + len(voice)]
+        ambient_padding = ambient[:PRE_ROLL_AMBIENT_MS]
+        mixed = voice.overlay(ambient_overlay)
     else:
         mixed = voice
 
+    output = ambient_padding + mixed
+
     try:
-        mixed.export(final_path, format=config.audio_format, bitrate=config.bitrate)
+        output.export(final_path, format=config.audio_format, bitrate=config.bitrate)
     except FileNotFoundError as exc:
         converter = getattr(AudioSegment, "converter", None)
         hint = (

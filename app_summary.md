@@ -56,6 +56,8 @@ Target baru: **membuat aplikasi web ringan** (misal dengan Streamlit) agar pengg
 * **Preview** parsing (misalnya konversi koma → `<br>`, dsb).
 * Tombol **Generate Deck** → menghasilkan `.apkg`.
 * Tombol **Download Deck** untuk mengambil file hasil.
+* **Preview CSV** 10 baris pertama sebelum build untuk memastikan format kartu sudah sesuai.
+* **Anki Deck Previewer** untuk mengunggah file `.apkg` dan meninjau kartu (front/back + audio) langsung di browser.
 
 ### Teknologi
 
