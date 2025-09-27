@@ -94,8 +94,14 @@ AUDIO_PLACEHOLDER_TEMPLATE = (
     "<span class='preview-placeholder'>Audio {name} akan dibuat saat ekspor deck.</span>"
 )
 
+
 # Placeholder to satisfy type checkers; actual value diberikan oleh uploader Streamlit di tab deck.
 deck_speaker_file = None
+
+
+# Placeholder agar variabel ada di scope global saat tab lain mengaksesnya
+deck_speaker_file = None
+ambient_file = None  # dipakai juga oleh tab Hanzi→Audio
 
 
 @dataclass(frozen=True)
@@ -110,7 +116,7 @@ class BuilderPreviewRow:
     index: int
     uid: str
     cards: List[BuilderPreviewCard]
-
+      
 def _resolve_default_audio(label: str, default_path: Path) -> None:
     if not default_path.exists():
         st.sidebar.warning(f"Letakkan file default {label} di: {default_path}")
@@ -226,10 +232,8 @@ def _build_csv_preview_rows(
 
     return rows, errors
 
-
 def _reset_apkg_page() -> None:
     st.session_state["apkg_page"] = 1
-
 
 def _render_csv_preview_html(rows: List[BuilderPreviewRow]) -> str:
     row_blocks = []
@@ -428,7 +432,9 @@ deck_tab, audio_tab, preview_tab = st.tabs([
     "🃏 Anki Deck Previewer",
 ])
 
-
+# ------------------
+# TAB: Deck Builder
+# ------------------
 with deck_tab:
     csv_preview_bytes: Optional[bytes] = None
     csv_preview_rows: List[BuilderPreviewRow] = []
@@ -557,7 +563,9 @@ with deck_tab:
                     mime="application/vnd.anki",
                 )
 
-
+# ------------------
+# TAB: Hanzi → Audio
+# ------------------
 with audio_tab:
     st.subheader("🔊 Hanzi → Audio Helper")
     st.markdown(
@@ -590,10 +598,11 @@ with audio_tab:
                     audio_speaker_file, tmp_dir, "speaker.wav", default_speaker
                 )
                 ambient_path = None
+                amb_path = None
                 if ambient_file:
-                    ambient_path = _prepare_audio_file(ambient_file, tmp_dir, "ambient.wav", default_ambient)
+                    amb_path = _prepare_audio_file(ambient_file, tmp_dir, "ambient.wav", default_ambient)
                 elif default_ambient.exists():
-                    ambient_path = default_ambient
+                    amb_path = default_ambient
 
                 if not speaker_path.exists():
                     st.error("Speaker WAV tidak ditemukan (upload atau letakkan 'vocal_serena1.wav' di root proyek).")
@@ -605,7 +614,7 @@ with audio_tab:
                                 text=hanzi_text,
                                 output_path=output_file,
                                 speaker_wav=speaker_path,
-                                ambient_wav=ambient_path,
+                                ambient_wav=amb_path,
                                 ffmpeg_path=_parse_ffmpeg_path(ffmpeg_path_text),
                                 tts_model_name=tts_model,
                                 tts_lang=tts_lang,
@@ -617,7 +626,7 @@ with audio_tab:
                         )
                     except DeckBuildError as exc:
                         st.error(str(exc))
-                    except Exception as exc:  # pragma: no cover - defensive against unexpected issues
+                    except Exception as exc:  # pragma: no cover
                         st.error(f"Gagal menghasilkan audio: {exc}")
                         st.write(
                             """<pre style='white-space:pre-wrap;'>""" + traceback.format_exc() + "</pre>",
@@ -643,14 +652,15 @@ with audio_tab:
             mime=preview_state.get("mime", "audio/mpeg"),
         )
 
-
+# ------------------
+# TAB: Anki Deck Previewer
+# ------------------
 with preview_tab:
     st.subheader("🃏 Anki Deck Previewer")
     st.markdown(
         "<span class='small'>Upload file deck `.apkg` untuk melihat kartu lengkap dengan template dan audio.</span>",
         unsafe_allow_html=True,
     )
-
     st.markdown(
         """
         <style>
@@ -678,6 +688,7 @@ with preview_tab:
     session.setdefault("apkg_digest", None)
     session.setdefault("apkg_filename", None)
 
+    apkg_state = st.session_state.setdefault("apkg_preview", {})
     apkg_file = st.file_uploader(
         "Deck Anki (.apkg)", type=["apkg"], key="deck_previewer_apkg_uploader"
     )
@@ -686,6 +697,7 @@ with preview_tab:
         apkg_bytes = apkg_file.getvalue()
         digest = hashlib.sha1(apkg_bytes).hexdigest()
         if session.get("apkg_digest") != digest:
+        if apkg_state.get("digest") != digest:
             with st.spinner("Memuat deck…"):
                 try:
                     preview_data: ApkgPreview = load_apkg_preview(apkg_bytes)
@@ -905,4 +917,94 @@ with preview_tab:
     elif apkg_file is not None and not session.get("apkg_error"):
         st.info("Deck tidak memiliki kartu untuk dipreview.")
     elif not session.get("apkg_error"):
+=======
+                    st.error(str(exc))
+                    apkg_state.clear()
+                    apkg_state["error"] = str(exc)
+                except Exception as exc:  # pragma: no cover
+                    st.error(f"Gagal memuat deck: {exc}")
+                    st.write(
+                        """<pre style='white-space:pre-wrap;'>"""
+                        + traceback.format_exc()
+                        + "</pre>",
+                        unsafe_allow_html=True,
+                    )
+                    apkg_state.clear()
+                    apkg_state["error"] = str(exc)
+                else:
+                    apkg_state.clear()
+                    apkg_state.update(
+                        {
+                            "digest": digest,
+                            "cards": preview_data.cards,
+                            "filename": apkg_file.name,
+                            "error": None,
+                            "selected": preview_data.cards[0].card_id if preview_data.cards else None,
+                            "show_answer": False,
+                        }
+                    )
+                    st.session_state.pop("apkg_card_radio", None)
+    elif not apkg_state:
+        apkg_state["cards"] = []
+
+    if apkg_state.get("error"):
+        st.error(apkg_state["error"])
+
+    cards: List[PreviewCard] = apkg_state.get("cards") or []
+    if cards:
+        selected_id = apkg_state.get("selected")
+        card_ids = {card.card_id for card in cards}
+        if selected_id not in card_ids:
+            selected_id = cards[0].card_id
+            apkg_state["selected"] = selected_id
+
+        labels: List[str] = []
+        label_to_id: Dict[str, int] = {}
+        for card in cards:
+            summary = card.front_summary or "(kosong)"
+            if len(summary) > 80:
+                summary = summary[:77] + "…"
+            base_label = f"{card.deck_name} • {summary}"
+            label = base_label if base_label not in label_to_id else f"{base_label} (#{card.card_id})"
+            labels.append(label)
+            label_to_id[label] = card.card_id
+
+        default_label = next(
+            (label for label, cid in label_to_id.items() if cid == selected_id),
+            labels[0],
+        )
+        if st.session_state.get("apkg_card_radio") not in label_to_id:
+            st.session_state["apkg_card_radio"] = default_label
+
+        list_col, preview_col = st.columns([1, 2])
+
+        with list_col:
+            filename = apkg_state.get("filename") or "Tanpa nama"
+            st.caption(f"Deck: {filename} • {len(cards)} kartu")
+            selected_label = st.radio("Daftar kartu", labels, key="apkg_card_radio")
+            selected_id = label_to_id[selected_label]
+            if selected_id != apkg_state.get("selected"):
+                apkg_state["selected"] = selected_id
+                apkg_state["show_answer"] = False
+
+        selected_card = next(card for card in cards if card.card_id == selected_id)
+        show_answer = apkg_state.get("show_answer", False)
+
+        with preview_col:
+            st.markdown(
+                f"**Template:** {selected_card.template_name}"
+            )
+            toggle_label = "Show Answer" if not show_answer else "Tampilkan Front"
+            if st.button(toggle_label, key="apkg_toggle_answer"):
+                show_answer = not show_answer
+                apkg_state["show_answer"] = show_answer
+
+            html_doc = wrap_card_html(
+                selected_card.back_html if show_answer else selected_card.front_html,
+                selected_card.css,
+            )
+            st.components.v1.html(html_doc, height=560, scrolling=True)
+    elif apkg_file is not None and not apkg_state.get("error"):
+        st.info("Deck tidak memiliki kartu untuk dipreview.")
+    else:
         st.info("Upload file deck .apkg untuk mulai melakukan preview.")

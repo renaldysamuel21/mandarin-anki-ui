@@ -14,6 +14,8 @@ A Streamlit web app that turns Mandarin vocabulary or sentence lists into polish
 - Dukungan upload opsional file speaker WAV di tab Hanzi → Audio (gunakan `vocal_serena1.wav` bawaan jika tidak memilih file).
 - Preview 10 baris pertama CSV dalam format kartu Anki sebelum proses build untuk memastikan data sudah benar.
 - Tab "🃏 Anki Deck Previewer" untuk mengunggah deck `.apkg`, menelusuri daftar kartu, dan melihat sisi depan/belakang lengkap dengan audio yang dapat diputar.
+- Preview 10 baris pertama CSV dalam format kartu Anki sebelum proses build untuk memastikan data sudah benar.
+- Tab "🃏 Anki Deck Previewer" untuk mengunggah deck `.apkg`, menelusuri daftar kartu, dan melihat sisi depan/belakang lengkap dengan audio yang dapat diputar.
 
 ## 🚀 Persiapan di Windows
 
