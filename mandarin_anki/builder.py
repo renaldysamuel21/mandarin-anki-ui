@@ -8,6 +8,10 @@ import random
 import re
 from pathlib import Path
 import os
+
+import shutil
+
+
 from typing import Callable, Dict, List, Optional, Protocol, Sequence
 
 import genanki
@@ -141,8 +145,65 @@ def _literal_to_br(text: str, enable: bool) -> str:
     return s
 
 
+def _configure_pydub(converter: Path) -> None:
+    resolved = converter.resolve()
+    AudioSegment.converter = str(resolved)
+    if hasattr(AudioSegment, "ffmpeg"):
+        AudioSegment.ffmpeg = str(resolved)
+    ffprobe_candidate = resolved.with_name(
+        "ffprobe.exe" if resolved.name.lower().endswith(".exe") else "ffprobe"
+    )
+    if ffprobe_candidate.exists() and hasattr(AudioSegment, "ffprobe"):
+        AudioSegment.ffprobe = str(ffprobe_candidate)
+
+
+def _normalise_ffmpeg_candidate(value: Path) -> Path:
+    candidate = value.expanduser()
+    if candidate.is_dir():
+        exe_name = "ffmpeg.exe" if os.name == "nt" else "ffmpeg"
+        candidate = candidate / exe_name
+    return candidate
+
+
 def _ensure_ffmpeg(path: Optional[Path]) -> None:
     """Configure pydub so it can locate FFmpeg on the current machine."""
+
+
+    if path:
+        candidate = _normalise_ffmpeg_candidate(path)
+        if not candidate.exists():
+            raise DeckBuildError(f"FFmpeg tidak ditemukan di path yang diberikan: {candidate}")
+        _configure_pydub(candidate)
+        return
+
+    existing_converter = getattr(AudioSegment, "converter", None)
+    if existing_converter:
+        try:
+            existing_path = Path(existing_converter)
+        except (TypeError, ValueError):
+            existing_path = None
+        if existing_path and existing_path.exists():
+            return
+
+    env_candidate = os.environ.get("FFMPEG_BINARY") or os.environ.get("FFMPEG_PATH")
+    candidates: List[Path] = []
+    if env_candidate:
+        candidates.append(Path(env_candidate))
+
+    exe_name = "ffmpeg.exe" if os.name == "nt" else "ffmpeg"
+    which_path = shutil.which(exe_name)
+    if which_path:
+        candidates.append(Path(which_path))
+
+    for candidate in candidates:
+        candidate_path = _normalise_ffmpeg_candidate(candidate)
+        if candidate_path.exists():
+            _configure_pydub(candidate_path)
+            return
+
+    raise DeckBuildError(
+        "FFmpeg tidak ditemukan. Isi path FFmpeg di pengaturan atau tambahkan ke PATH."
+    )
 
     if not path:
         return
@@ -166,6 +227,7 @@ def _ensure_ffmpeg(path: Optional[Path]) -> None:
     )
     if ffprobe_candidate.exists() and hasattr(AudioSegment, "ffprobe"):
         AudioSegment.ffprobe = str(ffprobe_candidate)
+
 
 
 def _notify(callback: Optional[ProgressCallback], stage: str, *, current: int = 0, total: int = 0, message: Optional[str] = None) -> None:
@@ -219,6 +281,7 @@ def _render_audio(
     config: DeckBuildConfig,
     final_path: Path,
 ) -> None:
+    final_path.parent.mkdir(parents=True, exist_ok=True)
     tts.tts_to_file(
         text=text,
         speaker_wav=str(speaker_wav),
@@ -379,11 +442,13 @@ def build_anki_deck(
             literal_br = _literal_to_br(literal, config.use_literal_linebreaks)
 
             if not audio_name:
-                audio_name = f"{base_name.lower()}_{idx:03d}.{config.audio_format}"
-            elif not audio_name.lower().endswith(f".{config.audio_format}"):
-                audio_name = f"{Path(audio_name).stem}.{config.audio_format}"
+                audio_rel_path = Path(f"{base_name.lower()}_{idx:03d}.{config.audio_format}")
+            else:
+                audio_rel_path = Path(audio_name)
+                if audio_rel_path.suffix.lower() != f".{config.audio_format}":
+                    audio_rel_path = audio_rel_path.with_suffix(f".{config.audio_format}")
 
-            audio_path = config.output_dir / audio_name
+            audio_path = config.output_dir / audio_rel_path
 
             if config.regenerate_audio_if_exists or not audio_path.exists():
                 ensure_tts()
@@ -402,6 +467,8 @@ def build_anki_deck(
             tag_list = [t for t in (tags or "").split() if t]
             tag_list.append(timestamp_tag)
 
+            audio_filename = audio_rel_path.name
+
             note = genanki.Note(
                 model=model,
                 fields=[
@@ -411,8 +478,8 @@ def build_anki_deck(
                     literal,
                     literal_br,
                     grammar,
-                    audio_name,
-                    f"[sound:{audio_name}]",
+                    audio_filename,
+                    f"[sound:{audio_filename}]",
                     enable_rm,
                     enable_lt,
                     enable_mp,

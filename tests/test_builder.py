@@ -143,6 +143,8 @@ def test_build_anki_deck_creates_package(tmp_path):
     ambient_wav = tmp_path / "ambient.wav"
     _build_wav(speaker_wav)
     _build_wav(ambient_wav)
+    ffmpeg_path = tmp_path / "ffmpeg"
+    ffmpeg_path.write_text("#!/bin/sh\n")
 
     config = DeckBuildConfig(
         csv_path=csv_path,
@@ -154,6 +156,7 @@ def test_build_anki_deck_creates_package(tmp_path):
         regenerate_audio_if_exists=True,
         delimiter=",",
         audio_format="wav",
+        ffmpeg_path=ffmpeg_path,
     )
 
     stages = []
@@ -168,3 +171,34 @@ def test_build_anki_deck_creates_package(tmp_path):
     assert result.row_errors == []
     assert {"init", "rows", "row", "complete"}.issubset(stages)
     assert all(media.suffix == ".wav" and media.exists() for media in result.media_files)
+
+
+def test_build_anki_deck_creates_nested_audio_directories(tmp_path):
+    csv_path = tmp_path / "deck.csv"
+    csv_path.write_text(
+        """Hanzi,Audio\n你好,custom/nested/audio\n""",
+        encoding="utf-8",
+    )
+
+    speaker_wav = tmp_path / "speaker.wav"
+    _build_wav(speaker_wav)
+    ffmpeg_path = tmp_path / "ffmpeg"
+    ffmpeg_path.write_text("#!/bin/sh\n")
+
+    config = DeckBuildConfig(
+        csv_path=csv_path,
+        output_dir=tmp_path / "output",
+        speaker_wav=speaker_wav,
+        tts_model_name="stub",
+        tts_lang="zh",
+        regenerate_audio_if_exists=True,
+        delimiter=",",
+        audio_format="wav",
+        ffmpeg_path=ffmpeg_path,
+    )
+
+    result = build_anki_deck(config, tts_factory=_StubFactory())
+
+    expected_audio = config.output_dir / "custom/nested/audio.wav"
+    assert expected_audio.exists()
+    assert expected_audio in result.media_files
