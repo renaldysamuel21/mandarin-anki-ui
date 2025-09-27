@@ -93,9 +93,9 @@ AUDIO_PLACEHOLDER_TEMPLATE = (
     "<span class='preview-placeholder'>Audio {name} akan dibuat saat ekspor deck.</span>"
 )
 
-# Placeholder to satisfy type checkers; actual value diberikan oleh uploader Streamlit di tab deck.
+# Placeholder agar variabel ada di scope global saat tab lain mengaksesnya
 deck_speaker_file = None
-
+ambient_file = None  # dipakai juga oleh tab Hanzi→Audio
 
 @dataclass(frozen=True)
 class BuilderPreviewCard:
@@ -109,6 +109,7 @@ class BuilderPreviewRow:
     index: int
     uid: str
     cards: List[BuilderPreviewCard]
+
 
 def _resolve_default_audio(label: str, default_path: Path) -> None:
     if not default_path.exists():
@@ -423,7 +424,9 @@ deck_tab, audio_tab, preview_tab = st.tabs([
     "🃏 Anki Deck Previewer",
 ])
 
-
+# ------------------
+# TAB: Deck Builder
+# ------------------
 with deck_tab:
     csv_preview_bytes: Optional[bytes] = None
     csv_preview_rows: List[BuilderPreviewRow] = []
@@ -552,7 +555,9 @@ with deck_tab:
                     mime="application/vnd.anki",
                 )
 
-
+# ------------------
+# TAB: Hanzi → Audio
+# ------------------
 with audio_tab:
     st.subheader("🔊 Hanzi → Audio Helper")
     st.markdown(
@@ -584,11 +589,11 @@ with audio_tab:
                 speaker_path = _prepare_audio_file(
                     audio_speaker_file, tmp_dir, "speaker.wav", default_speaker
                 )
-                ambient_path = None
+                amb_path = None
                 if ambient_file:
-                    ambient_path = _prepare_audio_file(ambient_file, tmp_dir, "ambient.wav", default_ambient)
+                    amb_path = _prepare_audio_file(ambient_file, tmp_dir, "ambient.wav", default_ambient)
                 elif default_ambient.exists():
-                    ambient_path = default_ambient
+                    amb_path = default_ambient
 
                 if not speaker_path.exists():
                     st.error("Speaker WAV tidak ditemukan (upload atau letakkan 'vocal_serena1.wav' di root proyek).")
@@ -600,7 +605,7 @@ with audio_tab:
                                 text=hanzi_text,
                                 output_path=output_file,
                                 speaker_wav=speaker_path,
-                                ambient_wav=ambient_path,
+                                ambient_wav=amb_path,
                                 ffmpeg_path=_parse_ffmpeg_path(ffmpeg_path_text),
                                 tts_model_name=tts_model,
                                 tts_lang=tts_lang,
@@ -612,7 +617,7 @@ with audio_tab:
                         )
                     except DeckBuildError as exc:
                         st.error(str(exc))
-                    except Exception as exc:  # pragma: no cover - defensive against unexpected issues
+                    except Exception as exc:  # pragma: no cover
                         st.error(f"Gagal menghasilkan audio: {exc}")
                         st.write(
                             """<pre style='white-space:pre-wrap;'>""" + traceback.format_exc() + "</pre>",
@@ -638,7 +643,9 @@ with audio_tab:
             mime=preview_state.get("mime", "audio/mpeg"),
         )
 
-
+# ------------------
+# TAB: Anki Deck Previewer
+# ------------------
 with preview_tab:
     st.subheader("🃏 Anki Deck Previewer")
     st.markdown(
@@ -662,7 +669,7 @@ with preview_tab:
                     st.error(str(exc))
                     apkg_state.clear()
                     apkg_state["error"] = str(exc)
-                except Exception as exc:  # pragma: no cover - defensive logging
+                except Exception as exc:  # pragma: no cover
                     st.error(f"Gagal memuat deck: {exc}")
                     st.write(
                         """<pre style='white-space:pre-wrap;'>"""
