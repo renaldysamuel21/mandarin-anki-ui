@@ -59,6 +59,7 @@ project_root = Path(".").resolve()
 default_speaker = project_root / "vocal_serena1.wav"
 default_ambient = project_root / "room.wav"
 
+
 DECK_CARD_CSS = """
 .card { font-family: system-ui, 'Noto Sans CJK SC', 'PingFang SC', sans-serif; background:#0b0b0e; color:#eaeaf0; }
 hr { border: 0; border-top: 1px solid #2a2a34; }
@@ -109,6 +110,11 @@ class BuilderPreviewRow:
     index: int
     uid: str
     cards: List[BuilderPreviewCard]
+
+
+# Placeholder to satisfy type checkers; actual value diberikan oleh uploader Streamlit di tab deck.
+deck_speaker_file = None
+
 
 def _resolve_default_audio(label: str, default_path: Path) -> None:
     if not default_path.exists():
@@ -435,9 +441,13 @@ with deck_tab:
 
     with left:
         st.subheader("📥 Upload")
+
         csv_file = st.file_uploader(
             "CSV (delimiter sesuai pilihan)", type=["csv", "txt"], key="csv_uploader"
         )
+
+        csv_file = st.file_uploader("CSV (delimiter sesuai pilihan)", type=["csv", "txt"], key="csv_uploader")
+
         deck_speaker_file = st.file_uploader(
             "Speaker WAV (opsional)", type=["wav"], key="speaker_uploader"
         )
