@@ -669,7 +669,7 @@ with preview_tab:
         .apkg-card-list label:hover { background: rgba(255,255,255,0.05); }
         .apkg-card-list label[data-baseweb] { cursor: pointer; }
         .apkg-preview-header-block { position: sticky; top: 0; z-index: 20; background: var(--panel,#15151c); padding: 0.75rem; border-radius: 12px; border:1px solid #2a2a34; margin-bottom: 0.75rem; box-shadow: 0 8px 24px rgba(0,0,0,0.25); }
-        .apkg-card-frame { height: 72vh; border-radius: 12px; overflow-y: auto; border:1px solid #2a2a34; background: var(--panel,#15151c); padding: 0.5rem; }
+        .apkg-card-frame { border-radius: 12px; border:1px solid #2a2a34; background: var(--panel,#15151c); padding: 0.5rem; }
         .apkg-card-section { margin-bottom: 1.25rem; }
         .apkg-card-section:last-child { margin-bottom: 0; }
         .apkg-answer-divider { border: 0; border-top: 1px dashed rgba(255,255,255,0.1); margin: 1.5rem 0; }
