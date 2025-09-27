@@ -59,7 +59,6 @@ project_root = Path(".").resolve()
 default_speaker = project_root / "vocal_serena1.wav"
 default_ambient = project_root / "room.wav"
 
-
 DECK_CARD_CSS = """
 .card { font-family: system-ui, 'Noto Sans CJK SC', 'PingFang SC', sans-serif; background:#0b0b0e; color:#eaeaf0; }
 hr { border: 0; border-top: 1px solid #2a2a34; }
@@ -94,9 +93,9 @@ AUDIO_PLACEHOLDER_TEMPLATE = (
     "<span class='preview-placeholder'>Audio {name} akan dibuat saat ekspor deck.</span>"
 )
 
-# Placeholder to satisfy type checkers; actual value diberikan oleh uploader Streamlit di tab deck.
+# Placeholder agar variabel ada di scope global saat tab lain mengaksesnya
 deck_speaker_file = None
-
+ambient_file = None  # dipakai juga oleh tab Hanzi→Audio
 
 @dataclass(frozen=True)
 class BuilderPreviewCard:
@@ -110,10 +109,6 @@ class BuilderPreviewRow:
     index: int
     uid: str
     cards: List[BuilderPreviewCard]
-
-
-# Placeholder to satisfy type checkers; actual value diberikan oleh uploader Streamlit di tab deck.
-deck_speaker_file = None
 
 
 def _resolve_default_audio(label: str, default_path: Path) -> None:
@@ -429,7 +424,9 @@ deck_tab, audio_tab, preview_tab = st.tabs([
     "🃏 Anki Deck Previewer",
 ])
 
-
+# ------------------
+# TAB: Deck Builder
+# ------------------
 with deck_tab:
     csv_preview_bytes: Optional[bytes] = None
     csv_preview_rows: List[BuilderPreviewRow] = []
@@ -441,17 +438,21 @@ with deck_tab:
 
     with left:
         st.subheader("📥 Upload")
-
         csv_file = st.file_uploader(
-            "CSV (delimiter sesuai pilihan)", type=["csv", "txt"], key="csv_uploader"
+            "CSV (delimiter sesuai pilihan)",
+            type=["csv", "txt"],
+            key="deck_builder_csv_uploader",
         )
-
-        csv_file = st.file_uploader("CSV (delimiter sesuai pilihan)", type=["csv", "txt"], key="csv_uploader")
-
         deck_speaker_file = st.file_uploader(
-            "Speaker WAV (opsional)", type=["wav"], key="speaker_uploader"
+            "Speaker WAV (opsional)",
+            type=["wav"],
+            key="deck_builder_speaker_uploader",
         )
-        ambient_file = st.file_uploader("Ambient WAV (opsional)", type=["wav"], key="ambient_uploader")
+        ambient_file = st.file_uploader(
+            "Ambient WAV (opsional)",
+            type=["wav"],
+            key="deck_builder_ambient_uploader",
+        )
 
         st.markdown(
             "<span class='small'>Jika tidak upload speaker/ambient, app memakai default di folder proyek.</span>",
@@ -554,7 +555,9 @@ with deck_tab:
                     mime="application/vnd.anki",
                 )
 
-
+# ------------------
+# TAB: Hanzi → Audio
+# ------------------
 with audio_tab:
     st.subheader("🔊 Hanzi → Audio Helper")
     st.markdown(
@@ -567,7 +570,7 @@ with audio_tab:
     audio_speaker_file = st.file_uploader(
         "Speaker WAV khusus tab ini (opsional)",
         type=["wav"],
-        key="audio_tab_speaker_uploader",
+        key="hanzi_audio_tab_speaker_uploader",
     )
     st.markdown(
         "<span class='small'>Opsional: unggah sampel suara .wav untuk meniru speaker tertentu."
@@ -586,11 +589,11 @@ with audio_tab:
                 speaker_path = _prepare_audio_file(
                     audio_speaker_file, tmp_dir, "speaker.wav", default_speaker
                 )
-                ambient_path = None
+                amb_path = None
                 if ambient_file:
-                    ambient_path = _prepare_audio_file(ambient_file, tmp_dir, "ambient.wav", default_ambient)
+                    amb_path = _prepare_audio_file(ambient_file, tmp_dir, "ambient.wav", default_ambient)
                 elif default_ambient.exists():
-                    ambient_path = default_ambient
+                    amb_path = default_ambient
 
                 if not speaker_path.exists():
                     st.error("Speaker WAV tidak ditemukan (upload atau letakkan 'vocal_serena1.wav' di root proyek).")
@@ -602,7 +605,7 @@ with audio_tab:
                                 text=hanzi_text,
                                 output_path=output_file,
                                 speaker_wav=speaker_path,
-                                ambient_wav=ambient_path,
+                                ambient_wav=amb_path,
                                 ffmpeg_path=_parse_ffmpeg_path(ffmpeg_path_text),
                                 tts_model_name=tts_model,
                                 tts_lang=tts_lang,
@@ -614,7 +617,7 @@ with audio_tab:
                         )
                     except DeckBuildError as exc:
                         st.error(str(exc))
-                    except Exception as exc:  # pragma: no cover - defensive against unexpected issues
+                    except Exception as exc:  # pragma: no cover
                         st.error(f"Gagal menghasilkan audio: {exc}")
                         st.write(
                             """<pre style='white-space:pre-wrap;'>""" + traceback.format_exc() + "</pre>",
@@ -640,7 +643,9 @@ with audio_tab:
             mime=preview_state.get("mime", "audio/mpeg"),
         )
 
-
+# ------------------
+# TAB: Anki Deck Previewer
+# ------------------
 with preview_tab:
     st.subheader("🃏 Anki Deck Previewer")
     st.markdown(
@@ -650,7 +655,7 @@ with preview_tab:
 
     apkg_state = st.session_state.setdefault("apkg_preview", {})
     apkg_file = st.file_uploader(
-        "Deck Anki (.apkg)", type=["apkg"], key="apkg_uploader"
+        "Deck Anki (.apkg)", type=["apkg"], key="deck_previewer_apkg_uploader"
     )
 
     if apkg_file is not None:
@@ -664,7 +669,7 @@ with preview_tab:
                     st.error(str(exc))
                     apkg_state.clear()
                     apkg_state["error"] = str(exc)
-                except Exception as exc:  # pragma: no cover - defensive logging
+                except Exception as exc:  # pragma: no cover
                     st.error(f"Gagal memuat deck: {exc}")
                     st.write(
                         """<pre style='white-space:pre-wrap;'>"""
